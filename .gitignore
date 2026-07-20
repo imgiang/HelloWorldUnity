@@ -1,0 +1,69 @@
+# =============== #
+# Unity generated #
+# =============== #
+[Tt]emp/
+[Oo]bj/
+[Bb]uild
+[Ll]ibrary/
+[Dd]esign/
+UserSettings/
+Assets/BuildReports/
+Assets/BuildReports.meta
+sysinfo.txt
+*.stackdump
+*.symbols.zip
+# ===================================== #
+# Visual Studio / MonoDevelop generated #
+# ===================================== #
+[Ee]xported[Oo]bj/
+.vs/
+/*.userprefs
+/*.csproj
+/*.pidb
+/*.suo
+/*.sln*
+/*.user
+/*.unityproj
+/*.booproj
+/*.vscode
+# ============ #
+# OS generated #
+# ============ #
+.DS_Store*
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+[Tt]humbs.db
+
+# =============== #
+# Firebase #
+# =============== #
+remote_config_data
+
+# =============== #
+# Rider #
+# =============== #
+.idea/
+/Logs/
+
+# =============== #
+# Others #
+# =============== #
+KeyStoreTool.cs
+KeyStoreTool.cs.meta
+*.keystore
+Packages/com.merry-yellow.code-assist
+Packages/com.merry-yellow.code-assist.meta
+/AuxiliaryFiles/
+/ExportedProject/
+/Builds/
+.claude
+.gitnexus
+CLAUDE.md
+AGENTS.md
+.dotnet
+Assets/0.GAME/graphify-out
+Assets/0.GAME/graphify-out.meta
+graphify-out
+.graphify_uncached.txt
