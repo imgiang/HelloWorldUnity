@@ -1,11 +1,18 @@
 using Unity.Entities;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
 
 /// <summary>
 /// Reads device input through the Input System and forwards it into the ECS world as a single
 /// <see cref="PlayerInputState"/> singleton. This is the only script allowed to talk to
 /// UnityEngine.InputSystem directly; every gameplay/camera system downstream only ever reads ECS data.
+/// Mouse/touch look only counts while <see cref="_lookEnableActionName"/> (left mouse button, or a
+/// touch) is held - the cursor is free otherwise and only gets locked/hidden for the duration of a
+/// mouse hold, so this is also the one place that owns Cursor state. Gamepad right-stick look is
+/// always active (no hold needed) since the stick naturally re-centers when released. A press that
+/// starts over UI (e.g. the on-screen move joystick) never drives look, so touch-drag-to-look and
+/// the joystick don't fight over the same finger.
 /// </summary>
 public class PlayerInputReader : MonoBehaviour
 {
@@ -13,14 +20,19 @@ public class PlayerInputReader : MonoBehaviour
     [SerializeField] private string _actionMapName = "Gameplay";
     [SerializeField] private string _moveActionName = "Move";
     [SerializeField] private string _lookActionName = "Look";
+    [SerializeField] private string _lookEnableActionName = "LookEnable";
+    [SerializeField] private string _lookStickActionName = "LookStick";
     [SerializeField] private string _jumpActionName = "Jump";
     [SerializeField] private string _sprintActionName = "Sprint";
     [SerializeField] private string _switchCameraActionName = "SwitchCamera";
     [SerializeField] private string _zoomActionName = "Zoom";
+    [SerializeField] private float _gamepadLookSensitivity = 180f;
 
     private InputActionMap _actionMap;
     private InputAction _moveAction;
     private InputAction _lookAction;
+    private InputAction _lookEnableAction;
+    private InputAction _lookStickAction;
     private InputAction _jumpAction;
     private InputAction _sprintAction;
     private InputAction _switchCameraAction;
@@ -29,6 +41,7 @@ public class PlayerInputReader : MonoBehaviour
     private EntityManager _entityManager;
     private Entity _singletonEntity;
     private bool _isBoundToEcsWorld;
+    private bool _lookBlockedByUI;
 
     /// <summary>Used by GameplaySceneBuilder to wire up the input asset at scene-creation time.</summary>
     public void AssignInputActions(InputActionAsset inputActions)
@@ -48,6 +61,8 @@ public class PlayerInputReader : MonoBehaviour
         _actionMap = _inputActions.FindActionMap(_actionMapName, throwIfNotFound: true);
         _moveAction = _actionMap.FindAction(_moveActionName, throwIfNotFound: true);
         _lookAction = _actionMap.FindAction(_lookActionName, throwIfNotFound: true);
+        _lookEnableAction = _actionMap.FindAction(_lookEnableActionName, throwIfNotFound: true);
+        _lookStickAction = _actionMap.FindAction(_lookStickActionName, throwIfNotFound: true);
         _jumpAction = _actionMap.FindAction(_jumpActionName, throwIfNotFound: true);
         _sprintAction = _actionMap.FindAction(_sprintActionName, throwIfNotFound: true);
         _switchCameraAction = _actionMap.FindAction(_switchCameraActionName, throwIfNotFound: true);
@@ -55,8 +70,12 @@ public class PlayerInputReader : MonoBehaviour
 
         _jumpAction.performed += OnJumpPerformed;
         _switchCameraAction.performed += OnSwitchCameraPerformed;
+        _lookEnableAction.started += OnLookEnableStarted;
+        _lookEnableAction.canceled += OnLookEnableCanceled;
 
         _actionMap.Enable();
+
+        SetCursorLocked(false);
     }
 
     private void OnDisable()
@@ -71,8 +90,16 @@ public class PlayerInputReader : MonoBehaviour
             _switchCameraAction.performed -= OnSwitchCameraPerformed;
         }
 
+        if (_lookEnableAction != null)
+        {
+            _lookEnableAction.started -= OnLookEnableStarted;
+            _lookEnableAction.canceled -= OnLookEnableCanceled;
+        }
+
         _actionMap?.Disable();
         _isBoundToEcsWorld = false;
+
+        SetCursorLocked(false);
     }
 
     private void Update()
@@ -82,14 +109,64 @@ public class PlayerInputReader : MonoBehaviour
             return;
         }
 
+        bool lookEnabled = _lookEnableAction.IsPressed() && !_lookBlockedByUI;
+        Vector2 mouseLook = lookEnabled ? _lookAction.ReadValue<Vector2>() : Vector2.zero;
+        // The stick reports a steady deflection (not a per-frame delta like the mouse), so scale it
+        // by deltaTime to get an equivalent per-frame rotation amount.
+        Vector2 stickLook = _lookStickAction.ReadValue<Vector2>() * (_gamepadLookSensitivity * Time.deltaTime);
+
         PlayerInputState state = _entityManager.GetComponentData<PlayerInputState>(_singletonEntity);
         state.MoveInput = _moveAction.ReadValue<Vector2>();
-        state.LookInput = _lookAction.ReadValue<Vector2>();
+        state.LookInput = mouseLook + stickLook;
         state.ZoomInput = _zoomAction.ReadValue<float>();
         state.SprintHeld = _sprintAction.IsPressed();
         // JumpQueued / SwitchCameraQueued are only ever set to true here (from the callbacks below)
         // and cleared by the ECS systems that consume them - never overwrite them with false in this method.
         _entityManager.SetComponentData(_singletonEntity, state);
+    }
+
+    private void OnLookEnableStarted(InputAction.CallbackContext context)
+    {
+        // Decided once at press time (not re-checked every frame) so a look-drag that later
+        // crosses over a UI element (e.g. the on-screen joystick) doesn't get cut off mid-drag.
+        _lookBlockedByUI = IsPointerOverUI(context);
+        if (!_lookBlockedByUI)
+        {
+            SetCursorLocked(true);
+        }
+    }
+
+    private void OnLookEnableCanceled(InputAction.CallbackContext context)
+    {
+        _lookBlockedByUI = false;
+        SetCursorLocked(false);
+    }
+
+    private static bool IsPointerOverUI(InputAction.CallbackContext context)
+    {
+        if (EventSystem.current == null)
+        {
+            return false;
+        }
+
+        // A touch press needs its own touch id; the mouse/pen pointer uses the default (-1).
+        if (context.control?.device is Touchscreen touchscreen)
+        {
+            int touchId = touchscreen.primaryTouch.touchId.ReadValue();
+            return EventSystem.current.IsPointerOverGameObject(touchId);
+        }
+
+        return EventSystem.current.IsPointerOverGameObject();
+    }
+
+    private static void SetCursorLocked(bool locked)
+    {
+        // Confined (not None) while free: the cursor stays visible and movable, but can't wander
+        // outside the game window - letting it leave the window (e.g. over another Editor panel
+        // in Play Mode) makes that panel steal keyboard focus, so WASD looks like it stops
+        // responding until the mouse drifts back over the Game View.
+        Cursor.lockState = locked ? CursorLockMode.Locked : CursorLockMode.Confined;
+        Cursor.visible = !locked;
     }
 
     private void OnJumpPerformed(InputAction.CallbackContext context)

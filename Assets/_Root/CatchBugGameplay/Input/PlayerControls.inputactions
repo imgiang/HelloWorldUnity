@@ -24,6 +24,24 @@
                     "initialStateCheck": false
                 },
                 {
+                    "name": "LookEnable",
+                    "type": "Button",
+                    "id": "1a2b3c4d-0007-4a1a-8a1a-000000000007",
+                    "expectedControlType": "Button",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                },
+                {
+                    "name": "LookStick",
+                    "type": "Value",
+                    "id": "1a2b3c4d-0008-4a1a-8a1a-000000000008",
+                    "expectedControlType": "Vector2",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
+                },
+                {
                     "name": "Jump",
                     "type": "Button",
                     "id": "1a2b3c4d-0003-4a1a-8a1a-000000000003",
@@ -62,7 +80,7 @@
             ],
             "bindings": [
                 {
-                    "name": "WASD",
+                    "name": "Arrows",
                     "id": "2b2b3c4d-0001-4a1a-8a1a-000000000101",
                     "path": "2DVector",
                     "interactions": "",
@@ -75,7 +93,7 @@
                 {
                     "name": "up",
                     "id": "2b2b3c4d-0002-4a1a-8a1a-000000000102",
-                    "path": "<Keyboard>/w",
+                    "path": "<Keyboard>/upArrow",
                     "interactions": "",
                     "processors": "",
                     "groups": "",
@@ -86,7 +104,7 @@
                 {
                     "name": "down",
                     "id": "2b2b3c4d-0003-4a1a-8a1a-000000000103",
-                    "path": "<Keyboard>/s",
+                    "path": "<Keyboard>/downArrow",
                     "interactions": "",
                     "processors": "",
                     "groups": "",
@@ -97,7 +115,7 @@
                 {
                     "name": "left",
                     "id": "2b2b3c4d-0004-4a1a-8a1a-000000000104",
-                    "path": "<Keyboard>/a",
+                    "path": "<Keyboard>/leftArrow",
                     "interactions": "",
                     "processors": "",
                     "groups": "",
@@ -108,7 +126,7 @@
                 {
                     "name": "right",
                     "id": "2b2b3c4d-0005-4a1a-8a1a-000000000105",
-                    "path": "<Keyboard>/d",
+                    "path": "<Keyboard>/rightArrow",
                     "interactions": "",
                     "processors": "",
                     "groups": "",
@@ -168,6 +186,116 @@
                     "processors": "",
                     "groups": "",
                     "action": "Zoom",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "2b2b3c4d-0011-4a1a-8a1a-000000000111",
+                    "path": "<Mouse>/leftButton",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "LookEnable",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "2b2b3c4d-0012-4a1a-8a1a-000000000112",
+                    "path": "<Gamepad>/leftStick",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "Move",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "2b2b3c4d-0013-4a1a-8a1a-000000000113",
+                    "path": "<Gamepad>/rightStick",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "LookStick",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "2b2b3c4d-0014-4a1a-8a1a-000000000114",
+                    "path": "<Gamepad>/buttonSouth",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "Jump",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "2b2b3c4d-0015-4a1a-8a1a-000000000115",
+                    "path": "<Gamepad>/leftStickPress",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "Sprint",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "2b2b3c4d-0016-4a1a-8a1a-000000000116",
+                    "path": "<Gamepad>/buttonNorth",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "SwitchCamera",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "2b2b3c4d-0017-4a1a-8a1a-000000000117",
+                    "path": "<Gamepad>/rightShoulder",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "Zoom",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "2b2b3c4d-0018-4a1a-8a1a-000000000118",
+                    "path": "<Gamepad>/leftShoulder",
+                    "interactions": "",
+                    "processors": "invert",
+                    "groups": "",
+                    "action": "Zoom",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "2b2b3c4d-0019-4a1a-8a1a-000000000119",
+                    "path": "<Touchscreen>/primaryTouch/press",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "LookEnable",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "2b2b3c4d-0020-4a1a-8a1a-000000000120",
+                    "path": "<Touchscreen>/primaryTouch/delta",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "Look",
                     "isComposite": false,
                     "isPartOfComposite": false
                 }

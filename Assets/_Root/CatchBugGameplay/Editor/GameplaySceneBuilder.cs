@@ -97,7 +97,7 @@ public static class GameplaySceneBuilder
         Selection.activeObject = AssetDatabase.LoadAssetAtPath<SceneAsset>(MainScenePath);
         EditorUtility.DisplayDialog(
             "Create Gameplay Scene",
-            "Gameplay scene created.\n\nPress Play: WASD to move, mouse to look, Shift to sprint, Space to jump, V to switch first/third person, scroll to zoom in third person.",
+            "Gameplay scene created.\n\nPress Play: Arrow keys to move, hold left mouse button + move mouse to look, Shift to sprint, Space to jump, V to switch first/third person, scroll to zoom in third person.",
             "OK");
     }
 
