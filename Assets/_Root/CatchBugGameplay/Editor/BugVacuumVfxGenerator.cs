@@ -18,6 +18,8 @@ public static class BugVacuumVfxGenerator
     private const string OutputFolder = "Assets/_Root/CatchBugGameplay/VFX/BugVacuum";
     private const string TracerPrefabPath = "Assets/_Root/CatchBugGameplay/VFX/Tracer.prefab";
     private const string VacuumBeamCoreMaterialPath = OutputFolder + "/VacuumBeamCore.mat";
+    private const string SparkleInkTexturePath = "Assets/Eric VFX Studio/Resource/Textures/Sparkle_Ink_001.png";
+    private const string SparkleInkMaterialPath = OutputFolder + "/SparkleInkLine.mat";
 
     private static readonly Color CyanMain1 = HexColor("#3FE8FF");
     private static readonly Color CyanMain2 = HexColor("#00CFFF");
@@ -564,6 +566,89 @@ public static class BugVacuumVfxGenerator
 
             current = next;
         }
+    }
+
+    // --- Wiring: try Sparkle_Ink_001.png (tiled) on the existing Tracer's Core LineRenderer -----
+    // Unlike FX_LootDrop_Blue, this is a plain texture applied to our own LineRenderer, which
+    // already tracks muzzle->hit point exactly every shot - so start/end control isn't a concern
+    // here, only whether the tiled wisp shape reads well stretched along the beam.
+
+    [MenuItem("Tools/Try Sparkle Ink Line Texture")]
+    public static void TrySparkleInkLineTexture()
+    {
+        GameObject tracerPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(TracerPrefabPath);
+        Texture2D texture = AssetDatabase.LoadAssetAtPath<Texture2D>(SparkleInkTexturePath);
+
+        if (tracerPrefab == null || texture == null)
+        {
+            EditorUtility.DisplayDialog(
+                "Sparkle Ink Line",
+                $"Could not apply - check that Tracer.prefab and '{SparkleInkTexturePath}' both exist.",
+                "OK");
+            return;
+        }
+
+        Material material = CreateAdditiveLineMaterial(SparkleInkMaterialPath, "SparkleInkLine", texture);
+        ApplyMaterialToTracerCore(material, tileScaleX: 3f);
+
+        EditorUtility.DisplayDialog(
+            "Sparkle Ink Line",
+            "Applied Sparkle_Ink_001 (tiled x3 along the beam) to Tracer.prefab's Core LineRenderer, replacing " +
+            "whatever it used before. This is a wisp/comet-tail shape, not a straight bar, so it repeats as a " +
+            "string of tapered wisps rather than one smooth line - if the repeat looks too sparse/dense, change " +
+            "the '3f' tileScaleX in TrySparkleInkLineTexture() and rerun.\n\n" +
+            "Run Tools/Generate Bug Vacuum VFX Textures again afterward if you want to switch the Core back to " +
+            "the procedural VacuumBeam texture instead.",
+            "OK");
+    }
+
+    private static void ApplyMaterialToTracerCore(Material material, float tileScaleX)
+    {
+        GameObject editablePrefab = PrefabUtility.LoadPrefabContents(TracerPrefabPath);
+        try
+        {
+            LineRenderer core = editablePrefab.GetComponent<LineRenderer>();
+            if (core == null)
+            {
+                return;
+            }
+
+            core.material = material;
+            core.textureMode = LineTextureMode.Tile;
+            core.textureScale = new Vector2(tileScaleX, 1f);
+
+            PrefabUtility.SaveAsPrefabAsset(editablePrefab, TracerPrefabPath);
+        }
+        finally
+        {
+            PrefabUtility.UnloadPrefabContents(editablePrefab);
+        }
+    }
+
+    private static Material CreateAdditiveLineMaterial(string path, string name, Texture2D texture)
+    {
+        Material existing = AssetDatabase.LoadAssetAtPath<Material>(path);
+        if (existing != null)
+        {
+            existing.SetTexture("_BaseMap", texture);
+            EditorUtility.SetDirty(existing);
+            return existing;
+        }
+
+        Shader shader = Shader.Find("Universal Render Pipeline/Particles/Unlit");
+        Material material = new Material(shader) { name = name };
+        material.SetFloat("_Surface", 1f);
+        material.SetFloat("_ZWrite", 0f);
+        material.SetFloat("_Cull", (float)UnityEngine.Rendering.CullMode.Off);
+        material.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
+        material.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Transparent;
+        material.SetFloat("_Blend", 2f);
+        material.SetFloat("_SrcBlend", (float)UnityEngine.Rendering.BlendMode.One);
+        material.SetFloat("_DstBlend", (float)UnityEngine.Rendering.BlendMode.One);
+        material.SetTexture("_BaseMap", texture);
+
+        AssetDatabase.CreateAsset(material, path);
+        return material;
     }
 
     // --- Wiring: apply VacuumBeam.png (tiled) to the existing Tracer's Core LineRenderer -------

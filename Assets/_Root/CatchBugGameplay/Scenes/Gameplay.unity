@@ -377,11 +377,6 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 169150999778964018, guid: 6f47d09379e4841039d5785ff539e3c8, type: 3}
   m_PrefabInstance: {fileID: 155857437}
   m_PrefabAsset: {fileID: 0}
---- !u!4 &9182736450192837465 stripped
-Transform:
-  m_CorrespondingSourceObject: {fileID: 8266959276050700432, guid: 6f47d09379e4841039d5785ff539e3c8, type: 3}
-  m_PrefabInstance: {fileID: 155857437}
-  m_PrefabAsset: {fileID: 0}
 --- !u!1 &155857439 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 169150999778964019, guid: 6f47d09379e4841039d5785ff539e3c8, type: 3}
@@ -403,6 +398,7 @@ MonoBehaviour:
   _muzzleFlashPrefab: {fileID: 0}
   _impactPrefab: {fileID: 0}
   _tracerPrefab: {fileID: 5936396066904751016, guid: 92b9cc2ed5424b644a17d113acbe4316, type: 3}
+  _beamEffectPrefab: {fileID: 8635872237641059682, guid: befa57134a096674592f63a438a24658, type: 3}
   _aimTarget: {fileID: 207192247}
 --- !u!1 &207192245
 GameObject:
@@ -1458,6 +1454,11 @@ MonoBehaviour:
   m_LightCookieSize: {x: 1, y: 1}
   m_LightCookieOffset: {x: 0, y: 0}
   m_SoftShadowQuality: 0
+--- !u!4 &9182736450192837465 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 8266959276050700432, guid: 6f47d09379e4841039d5785ff539e3c8, type: 3}
+  m_PrefabInstance: {fileID: 155857437}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

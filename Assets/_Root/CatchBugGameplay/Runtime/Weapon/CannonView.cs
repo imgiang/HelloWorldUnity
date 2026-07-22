@@ -16,6 +16,7 @@ public class CannonView : MonoBehaviour
     [SerializeField] private GameObject _muzzleFlashPrefab;
     [SerializeField] private GameObject _impactPrefab;
     [SerializeField] private GameObject _tracerPrefab;
+    [SerializeField] private TwoPointEffect _beamEffectPrefab;
     [SerializeField] private Transform _aimTarget;
 
     private void Awake()
@@ -72,13 +73,32 @@ public class CannonView : MonoBehaviour
         if (_tracerPrefab != null)
         {
             GameObject tracer = Instantiate(_tracerPrefab);
-            // The tracer is layered (bright core + soft outer glow) as separate LineRenderers on
-            // the root and its children, so every layer needs the same two endpoints.
+
+            // World-space LineRenderers ignore the transform for their actual path (positions are
+            // set explicitly below), but the two crossed "Core"/"Core2" layers use Local alignment,
+            // whose ribbon-plane orientation IS read from this transform's rotation - so it still
+            // needs to face down the beam each shot for their fixed 90-degree offset to cross
+            // correctly regardless of aim direction.
+            Vector3 beamDirection = hitPoint - _muzzle.position;
+            if (beamDirection.sqrMagnitude > 0.0001f)
+            {
+                tracer.transform.rotation = Quaternion.LookRotation(beamDirection);
+            }
+
+            // The tracer is layered (bright core + a second core crossed at 90 degrees for a
+            // rounder/3D look + soft outer glow) as separate LineRenderers on the root and its
+            // children, so every layer needs the same two endpoints.
             foreach (LineRenderer lineRenderer in tracer.GetComponentsInChildren<LineRenderer>())
             {
                 lineRenderer.SetPosition(0, _muzzle.position);
                 lineRenderer.SetPosition(1, hitPoint);
             }
+        }
+
+        if (_beamEffectPrefab != null)
+        {
+            TwoPointEffect beamEffect = Instantiate(_beamEffectPrefab);
+            beamEffect.SetEndpoints(_muzzle.position, hitPoint);
         }
     }
 }

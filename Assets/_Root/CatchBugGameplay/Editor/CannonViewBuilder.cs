@@ -26,6 +26,8 @@ public static class CannonViewBuilder
     private const string AdditiveMaterialPath = VfxFolder + "/MuzzleFlashAdditive.mat";
     private const string SmokeMaterialPath = VfxFolder + "/MuzzleFlashSmoke.mat";
     private const string TracerMaterialPath = VfxFolder + "/TracerBeam.mat";
+    private const string LootDropPrefabPath = "Assets/Eric VFX Studio/Free Game VFX/Prefab/FX_LootDrop_Blue.prefab";
+    private const string BeamEffectWrapperPath = VfxFolder + "/BeamEffect_LootDropBlue.prefab";
 
     private const string UiFolder = "Assets/_Root/CatchBugGameplay/UI";
     private const string CrosshairTexturePath = UiFolder + "/Crosshair.png";
@@ -100,6 +102,134 @@ public static class CannonViewBuilder
             "Fire (right mouse button / gamepad right trigger) spawns the impact VFX + tracer at whatever " +
             "the Aim Target is currently over (or at max range if nothing does).",
             "OK");
+    }
+
+    [MenuItem("Tools/Wire LootDrop Beam Effect")]
+    public static void WireLootDropBeamEffect()
+    {
+        GameObject lootDropPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(LootDropPrefabPath);
+        if (lootDropPrefab == null)
+        {
+            EditorUtility.DisplayDialog("Wire LootDrop Beam Effect", $"Could not find '{LootDropPrefabPath}'.", "OK");
+            return;
+        }
+
+        CannonView cannonView = Object.FindFirstObjectByType<CannonView>();
+        if (cannonView == null)
+        {
+            EditorUtility.DisplayDialog("Wire LootDrop Beam Effect", "No CannonView found in the open scene. Run Tools/Add Cannon View first.", "OK");
+            return;
+        }
+
+        GameObject wrapperPrefab = EnsureBeamEffectWrapper(lootDropPrefab);
+
+        SerializedObject serializedView = new SerializedObject(cannonView);
+        serializedView.FindProperty("_beamEffectPrefab").objectReferenceValue = wrapperPrefab.GetComponent<TwoPointEffect>();
+        serializedView.ApplyModifiedPropertiesWithoutUndo();
+
+        EditorSceneManager.MarkSceneDirty(SceneManager.GetActiveScene());
+
+        EditorUtility.DisplayDialog(
+            "Wire LootDrop Beam Effect",
+            "Wired FX_LootDrop_Blue (wrapped with a TwoPointEffect component) into CannonView as an extra beam " +
+            "effect fired alongside the existing tracer - it stretches its local Z axis between the muzzle and " +
+            "the hit point every shot.\n\n" +
+            "Fixed the rotation bug: this asset's particle systems had 'Play On Awake' enabled, so they were " +
+            "firing (in world space) using the wrapper's default transform the instant it was instantiated - " +
+            "before the muzzle/target direction could be applied. Play On Awake is now disabled on every " +
+            "nested particle system, and the wrapper starts them manually (with children) only after its " +
+            "transform is set correctly.\n\n" +
+            "Also fixed: FX_LootDrop_Blue was authored to point along its own local Up axis at identity " +
+            "rotation (a loot sparkle on the ground) - it's now rotated (via FromToRotation, mapping +Y onto " +
+            "+Z exactly) so it points down the wrapper's beam-facing Z axis instead of world-up. Check the " +
+            "Console for a '[LootDropBeam] Set ... localRotation to ...' log confirming this was actually " +
+            "applied - if that log is missing, the wrapper prefab wasn't found/updated; if it's present but " +
+            $"the effect still visibly points up, open '{BeamEffectWrapperPath}' and rotate its FX_LootDrop_Blue " +
+            "child by hand while watching the Scene view to find the correct angle empirically.\n\n" +
+            "Heads up: this asset's own child names (Back Glow/Front Glow/Pulses/twink/Sparks Confetti) and its " +
+            "'Line'/'Line_R' children having 0 start speed suggest it was authored as a stationary sparkle/glow " +
+            "burst, not something that travels a variable distance - so even correctly oriented, it may not " +
+            $"visually reach exactly to the target over long shots. If so, open '{BeamEffectWrapperPath}' and " +
+            "try 'Stretch Axis' X or Y on TwoPointEffect, or clear the Beam Effect Prefab field on CannonView " +
+            "and rely on the existing tracer (which does precisely track muzzle->target) for the connecting line.",
+            "OK");
+    }
+
+    private static GameObject EnsureBeamEffectWrapper(GameObject lootDropPrefab)
+    {
+        bool alreadyExists = AssetDatabase.LoadAssetAtPath<GameObject>(BeamEffectWrapperPath) != null;
+
+        GameObject root = alreadyExists
+            ? PrefabUtility.LoadPrefabContents(BeamEffectWrapperPath)
+            : new GameObject("BeamEffect_LootDropBlue");
+
+        if (!alreadyExists)
+        {
+            root.AddComponent<TwoPointEffect>();
+            SetDestroyAfter(root, 1.5f);
+
+            GameObject child = (GameObject)PrefabUtility.InstantiatePrefab(lootDropPrefab);
+            child.transform.SetParent(root.transform, false);
+        }
+
+        // FX_LootDrop_Blue was authored to point along its OWN local +Y at identity rotation (a
+        // loot pickup sparkle shooting up off the ground) - but TwoPointEffect rotates this
+        // wrapper's root so its local +Z faces the target (the muzzle->target beam direction).
+        // Left at identity, the child would still point along the wrapper's Y (roughly world-up
+        // after that rotation) instead of along the beam. FromToRotation(up, forward) is the
+        // rotation that maps local +Y onto local +Z exactly, computed directly rather than by hand
+        // (an Euler-angle guess here previously had no visible effect).
+        Transform lootDropChildTransform = root.transform.Find("FX_LootDrop_Blue");
+        if (lootDropChildTransform == null && root.transform.childCount > 0)
+        {
+            lootDropChildTransform = root.transform.GetChild(0);
+        }
+
+        if (lootDropChildTransform != null)
+        {
+            lootDropChildTransform.localPosition = Vector3.zero;
+            lootDropChildTransform.localRotation = Quaternion.FromToRotation(Vector3.up, Vector3.forward);
+            Debug.Log($"[LootDropBeam] Set '{lootDropChildTransform.name}' localRotation to {lootDropChildTransform.localRotation.eulerAngles} (mapping +Y to +Z).");
+        }
+        else
+        {
+            Debug.LogWarning("[LootDropBeam] Could not find the FX_LootDrop_Blue child under the wrapper root - orientation not corrected.");
+        }
+
+        // Play On Awake would fire the moment this is instantiated, using whatever transform it
+        // has at that instant - since its particle systems simulate in world space (moveWithTransform
+        // is off), the direction/rotation set afterward by TwoPointEffect.SetEndpoints would arrive
+        // too late. Disable auto-play on every nested particle system and let SetEndpoints trigger
+        // the root one (with children) manually once the transform is correct.
+        ParticleSystem rootParticleSystem = null;
+        foreach (ParticleSystem particleSystem in root.GetComponentsInChildren<ParticleSystem>(true))
+        {
+            ParticleSystem.MainModule main = particleSystem.main;
+            main.playOnAwake = false;
+
+            if (particleSystem.transform.parent == root.transform)
+            {
+                rootParticleSystem = particleSystem;
+            }
+        }
+
+        TwoPointEffect twoPointEffect = root.GetComponent<TwoPointEffect>();
+        SerializedObject serializedEffect = new SerializedObject(twoPointEffect);
+        serializedEffect.FindProperty("_rootParticleSystem").objectReferenceValue = rootParticleSystem;
+        serializedEffect.ApplyModifiedPropertiesWithoutUndo();
+
+        GameObject prefab = PrefabUtility.SaveAsPrefabAsset(root, BeamEffectWrapperPath);
+
+        if (alreadyExists)
+        {
+            PrefabUtility.UnloadPrefabContents(root);
+        }
+        else
+        {
+            Object.DestroyImmediate(root);
+        }
+
+        return prefab;
     }
 
     private static float CalculateViewmodelScale(GameObject cannon)
