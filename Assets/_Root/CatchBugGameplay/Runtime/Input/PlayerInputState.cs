@@ -18,6 +18,7 @@ public struct PlayerInputState : IComponentData
     // it happens between two fixed-step ticks, without needing frame-perfect polling.
     public bool JumpQueued;
     public bool SwitchCameraQueued;
+    public bool FireQueued;
 
     public static Entity GetOrCreateSingleton(EntityManager entityManager)
     {

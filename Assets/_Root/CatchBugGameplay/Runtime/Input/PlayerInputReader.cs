@@ -26,6 +26,7 @@ public class PlayerInputReader : MonoBehaviour
     [SerializeField] private string _sprintActionName = "Sprint";
     [SerializeField] private string _switchCameraActionName = "SwitchCamera";
     [SerializeField] private string _zoomActionName = "Zoom";
+    [SerializeField] private string _fireActionName = "Fire";
     [SerializeField] private float _gamepadLookSensitivity = 180f;
 
     private InputActionMap _actionMap;
@@ -37,11 +38,19 @@ public class PlayerInputReader : MonoBehaviour
     private InputAction _sprintAction;
     private InputAction _switchCameraAction;
     private InputAction _zoomAction;
+    private InputAction _fireAction;
 
     private EntityManager _entityManager;
     private Entity _singletonEntity;
     private bool _isBoundToEcsWorld;
     private bool _lookBlockedByUI;
+
+    // A press's UI-hit-test can't be resolved inside the InputAction callback itself (the UI
+    // system hasn't raycast this frame yet at that point), so it's captured here and resolved on
+    // the next Update instead - see OnLookEnableStarted/Update.
+    private bool _lookEnableCheckPending;
+    private bool _pendingLookEnableIsTouch;
+    private int _pendingLookEnableTouchId;
 
     /// <summary>Used by GameplaySceneBuilder to wire up the input asset at scene-creation time.</summary>
     public void AssignInputActions(InputActionAsset inputActions)
@@ -67,9 +76,11 @@ public class PlayerInputReader : MonoBehaviour
         _sprintAction = _actionMap.FindAction(_sprintActionName, throwIfNotFound: true);
         _switchCameraAction = _actionMap.FindAction(_switchCameraActionName, throwIfNotFound: true);
         _zoomAction = _actionMap.FindAction(_zoomActionName, throwIfNotFound: true);
+        _fireAction = _actionMap.FindAction(_fireActionName, throwIfNotFound: true);
 
         _jumpAction.performed += OnJumpPerformed;
         _switchCameraAction.performed += OnSwitchCameraPerformed;
+        _fireAction.performed += OnFirePerformed;
         _lookEnableAction.started += OnLookEnableStarted;
         _lookEnableAction.canceled += OnLookEnableCanceled;
 
@@ -88,6 +99,11 @@ public class PlayerInputReader : MonoBehaviour
         if (_switchCameraAction != null)
         {
             _switchCameraAction.performed -= OnSwitchCameraPerformed;
+        }
+
+        if (_fireAction != null)
+        {
+            _fireAction.performed -= OnFirePerformed;
         }
 
         if (_lookEnableAction != null)
@@ -109,6 +125,19 @@ public class PlayerInputReader : MonoBehaviour
             return;
         }
 
+        if (_lookEnableCheckPending)
+        {
+            _lookEnableCheckPending = false;
+            _lookBlockedByUI = EventSystem.current != null && (_pendingLookEnableIsTouch
+                ? EventSystem.current.IsPointerOverGameObject(_pendingLookEnableTouchId)
+                : EventSystem.current.IsPointerOverGameObject());
+
+            if (!_lookBlockedByUI)
+            {
+                SetCursorLocked(true);
+            }
+        }
+
         bool lookEnabled = _lookEnableAction.IsPressed() && !_lookBlockedByUI;
         Vector2 mouseLook = lookEnabled ? _lookAction.ReadValue<Vector2>() : Vector2.zero;
         // The stick reports a steady deflection (not a per-frame delta like the mouse), so scale it
@@ -127,36 +156,24 @@ public class PlayerInputReader : MonoBehaviour
 
     private void OnLookEnableStarted(InputAction.CallbackContext context)
     {
-        // Decided once at press time (not re-checked every frame) so a look-drag that later
-        // crosses over a UI element (e.g. the on-screen joystick) doesn't get cut off mid-drag.
-        _lookBlockedByUI = IsPointerOverUI(context);
-        if (!_lookBlockedByUI)
-        {
-            SetCursorLocked(true);
-        }
+        // Can't call IsPointerOverGameObject() here - the UI system hasn't raycast this frame yet
+        // this early in event processing, so it would read stale (last frame's) UI state. Only
+        // capture what the callback safely can (which device/touch this is); the actual UI-hit
+        // check and cursor lock happen on the next Update instead. Decided once at press time
+        // (not re-checked every frame) so a look-drag that later crosses over a UI element (e.g.
+        // the on-screen joystick) doesn't get cut off mid-drag.
+        _lookEnableCheckPending = true;
+        _pendingLookEnableIsTouch = context.control?.device is Touchscreen;
+        _pendingLookEnableTouchId = _pendingLookEnableIsTouch
+            ? ((Touchscreen)context.control.device).primaryTouch.touchId.ReadValue()
+            : 0;
     }
 
     private void OnLookEnableCanceled(InputAction.CallbackContext context)
     {
+        _lookEnableCheckPending = false;
         _lookBlockedByUI = false;
         SetCursorLocked(false);
-    }
-
-    private static bool IsPointerOverUI(InputAction.CallbackContext context)
-    {
-        if (EventSystem.current == null)
-        {
-            return false;
-        }
-
-        // A touch press needs its own touch id; the mouse/pen pointer uses the default (-1).
-        if (context.control?.device is Touchscreen touchscreen)
-        {
-            int touchId = touchscreen.primaryTouch.touchId.ReadValue();
-            return EventSystem.current.IsPointerOverGameObject(touchId);
-        }
-
-        return EventSystem.current.IsPointerOverGameObject();
     }
 
     private static void SetCursorLocked(bool locked)
@@ -171,15 +188,20 @@ public class PlayerInputReader : MonoBehaviour
 
     private void OnJumpPerformed(InputAction.CallbackContext context)
     {
-        SetQueuedFlag(setJump: true, setSwitchCamera: false);
+        SetQueuedFlag(setJump: true, setSwitchCamera: false, setFire: false);
     }
 
     private void OnSwitchCameraPerformed(InputAction.CallbackContext context)
     {
-        SetQueuedFlag(setJump: false, setSwitchCamera: true);
+        SetQueuedFlag(setJump: false, setSwitchCamera: true, setFire: false);
     }
 
-    private void SetQueuedFlag(bool setJump, bool setSwitchCamera)
+    private void OnFirePerformed(InputAction.CallbackContext context)
+    {
+        SetQueuedFlag(setJump: false, setSwitchCamera: false, setFire: true);
+    }
+
+    private void SetQueuedFlag(bool setJump, bool setSwitchCamera, bool setFire)
     {
         if (!TryBindToEcsWorld())
         {
@@ -189,6 +211,7 @@ public class PlayerInputReader : MonoBehaviour
         PlayerInputState state = _entityManager.GetComponentData<PlayerInputState>(_singletonEntity);
         state.JumpQueued |= setJump;
         state.SwitchCameraQueued |= setSwitchCamera;
+        state.FireQueued |= setFire;
         _entityManager.SetComponentData(_singletonEntity, state);
     }
 
